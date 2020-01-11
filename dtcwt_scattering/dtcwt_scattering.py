@@ -16,7 +16,6 @@ class DtcwtScattering2D:
     Applies the scattering network transform to an image
     Returns a set of scattering coefficients.
     """
-
     def transform(self, image, m):
         n = len(image)
         J = int(np.log(n/4)/np.log(2)) + 1
