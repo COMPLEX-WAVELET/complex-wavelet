@@ -3,11 +3,7 @@ import numpy as np
 
 class DtcwtScattering2D:
     """
-    The constructor of a dtwct scattering network 
-    Attributes:
-        J - number of transformations
-        L - number of orientations
-        m - the depth of the network
+    The constructor of a dtwct scattering transform. 
     """
     def __init__(self):
         self._transform2D = dtcwt.Transform2d()
