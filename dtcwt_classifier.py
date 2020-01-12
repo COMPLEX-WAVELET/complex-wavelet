@@ -19,9 +19,14 @@ class DtcwtClassifier:
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 
+    def __resize_image(self, x):
+        current_size = len(x)
+        new_size = 2 ** (int(np.log2(current_size)) + 1)
+        return np.pad(x, pad_width=int((new_size - current_size)/2), mode='constant', constant_values=0)
+
     def __to_scat_vector(self, x):
         x_c = copy(x)
-        x_c = np.pad(x_c, pad_width=int((64-len(x))/2), mode='constant', constant_values=0)
+        x_c = self.__resize_image(x_c)
         scatCoef = self.transform2D.transform(np.asarray(x_c), self.m)
         scatVector = []
         for c in scatCoef:
