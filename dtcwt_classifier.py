@@ -2,14 +2,13 @@ from dtcwt_scattering import DtcwtScattering2D
 import numpy as np
 from copy import copy
 from sklearn.svm import SVC
-from sklearn.decomposition import PCA
+
 
 class DtcwtClassifier:
     def __init__(self, m=2):
         self.transform2D = DtcwtScattering2D()
         self.m = m
         self.model = SVC(kernel="linear", probability=True)
-        self.pca = PCA(0.9)
 
     def __resize_image(self, x):
         current_size = len(x)
@@ -34,10 +33,7 @@ class DtcwtClassifier:
         scatX = []
         for i in range(len(X)):
             scatX.append(self.__to_scat_vector(X[i]))
-        scatX = np.asarray(scatX)
-        self.pca.fit(scatX)
-
-        self.model.fit(self.pca.transform(scatX), y)
+        self.model.fit(scatX, y)
 
     def predict(self, X):
         scatX = []
@@ -49,4 +45,4 @@ class DtcwtClassifier:
         scatX = []
         for i in range(len(X)):
             scatX.append(self.__to_scat_vector(X[i]))
-        return self.model.score(self.pca.transform(scatX), y)
+        return self.model.score(scatX, y)
