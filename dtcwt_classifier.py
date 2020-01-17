@@ -1,14 +1,22 @@
-from dtcwt_scattering import DtcwtScattering2D
 import numpy as np
 from copy import copy
-from sklearn.svm import SVC
+from dtcwt_scattering import dtcwt_scattering_2d
+from models import svm_model, conv_1d
 
 
 class DtcwtClassifier:
-    def __init__(self, m=2):
-        self.transform2D = DtcwtScattering2D()
+    MODEL_SELECTOR = {"svm": svm_model.SVMModel(), "conv_1d": conv_1d.ConvModel_1D()}
+
+    DTCWT_TRANSFORM_SELECTOR = {
+        "custom": dtcwt_scattering_2d.DtcwtScattering2D(),
+    }
+
+    def __init__(self, m=2, model="svm", dtcwt_transform="custom"):
         self.m = m
-        self.model = SVC(kernel="linear", probability=True)
+        self.transform2D = DtcwtClassifier.DTCWT_TRANSFORM_SELECTOR.get(
+            dtcwt_transform, None
+        )
+        self.model = DtcwtClassifier.MODEL_SELECTOR.get(model, None)
 
     def __resize_image(self, x):
         current_size = len(x)
