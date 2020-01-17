@@ -26,8 +26,8 @@ class DtcwtClassifier:
         scatCoef = self.transform2D.transform(np.asarray(x_c), self.m)
         scatVector = []
         for c in scatCoef:
-            scatVector = scatVector + [c.flatten()]
-        return scatVector[0]
+            scatVector.append(c.flatten())
+        return np.asarray(scatVector).flatten()
 
     def fit(self, X, y):
         scatX = []
