@@ -1,11 +1,11 @@
 import numpy as np
 from copy import copy
 from dtcwt_scattering import dtcwt_scattering_2d
-from models import svm_model, conv_1d
+from models import svm, conv_1d
 
 
 class DtcwtClassifier:
-    MODEL_SELECTOR = {"svm": svm_model.SVMModel(), "conv_1d": conv_1d.ConvModel_1D()}
+    MODEL_SELECTOR = {"svm": svm.SVMModel(), "conv_1d": conv_1d.ConvModel_1D()}
 
     DTCWT_TRANSFORM_SELECTOR = {
         "custom": dtcwt_scattering_2d.DtcwtScattering2D(),
