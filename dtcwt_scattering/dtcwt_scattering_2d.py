@@ -12,7 +12,7 @@ class DtcwtScattering2D:
 
     def __init__(self):
         self._transform2D = dtcwt.Transform2d()
-        self.phases = [-1]  # -1 element for S0 as it doesn't have a phase
+        self.phases = [[-1]]  # -1 element for S0 as it doesn't have a phase
         self.nlevels = []
         self.scat_layers = []
         self.K = [-1]
@@ -33,36 +33,31 @@ class DtcwtScattering2D:
                     phase_max = phase
         return r_max, phase_max
 
-    def __store_phase(self, highpass):
-        h = highpass.shape[0]
-        w = highpass.shape[1]
-        r = [0] * 4
-        phase = [0] * 4
-        h = int(h / 2)
-        w = int(w / 2)
-        r[0], phase[0] = self.__get_region_magnitude_and_phase(highpass[:h, :w])
-        r[1], phase[1] = self.__get_region_magnitude_and_phase(highpass[:h, w:])
-        r[2], phase[2] = self.__get_region_magnitude_and_phase(highpass[h:, :w])
-        r[3], phase[3] = self.__get_region_magnitude_and_phase(highpass[h:, w:])
-
-        self.phases.append(phase)
-
-    def __set_region_phase(self, region, phase, highpass):
-        for i in range(region.shape[0]):
-            for j in range(region.shape[1]):
-                highpass[i, j] = cmath.rect(region[i, j], phase)
+    def __set_region_phase(self, i, j, phase, magnitude, highpass):
+        for i1 in range(i, i + 1):
+            for j1 in range(j, j + 1):
+                highpass[i1, j1] = cmath.rect(magnitude[i1, j1], phase)
 
     def __restore_phase(self, magnitude, phases):
+        highpass = np.zeros((magnitude.shape[0], magnitude.shape[1]), dtype=complex)
         h = magnitude.shape[0]
-        w = magnitude.shape[1]
-        h = int(h / 2)
-        w = int(w / 2)
-        highpass = np.ndarray(shape=(h, w), dtype=complex)
-        self.__set_region_phase(magnitude[:h, :w], phases[0], highpass)
-        self.__set_region_phase(magnitude[:h, w:], phases[1], highpass)
-        self.__set_region_phase(magnitude[h:, :w], phases[2], highpass)
-        self.__set_region_phase(magnitude[h:, w:], phases[3], highpass)
+        k = 0
+        for i in range(h):
+            for j in range(h):
+                highpass[i, j] = cmath.rect(magnitude[i, j], phases[k])
+                k += 1
+
         return highpass
+
+    def __store_phase(self, highpass):
+        h = highpass.shape[0]
+        phase = []
+
+        for i in range(h):
+            for j in range(h):
+                _, f = cmath.polar(highpass[i, j])
+                phase.append(f)
+        self.phases.append(phase)
 
     """
     Applies the scattering network transform to an image
@@ -77,7 +72,6 @@ class DtcwtScattering2D:
         self.nlevels.append(J + 1)
         self.scat_coefficients.append(image_t.lowpass)
         self.scat_layers.append(m)
-
         if m != 0:
             ancestor = len(self.scat_coefficients) - 1
             for j in range(0, J):
@@ -108,43 +102,55 @@ class DtcwtScattering2D:
         self.scat_layers = [m - layer for layer in self.scat_layers]
         return self.scat_coefficients
 
-    def __build_pyramid(self, m, im, is_lowpass):
+    def __build_pyramid(self, im, levels, is_lowpass, k):
         highpasses = []
         level = 0
-        for j in range(self.nlevels[m], 0, -1):
+
+        for j in range(levels, 0, -1):
             highpass = np.zeros((2 ** j, 2 ** j, 6), dtype=complex)
             highpasses.append(highpass)
             if 2 ** j == im.shape[0]:
                 level = len(highpasses) - 1
-        w = self.scat_coefficients[m].shape[0]
+
+        w = self.scat_coefficients[0].shape[0]
         lowpass = np.zeros((w, w), dtype=float)
+
         if not is_lowpass:
-            highpasses[level][:, :, self.K[m]] = im
+            highpasses[level][:, :, k] = im
         else:
             lowpass = im
 
         p = dtcwt.Pyramid(lowpass=lowpass, highpasses=tuple(highpasses))
         return p
 
-    def _inverse(self, im, m, layer_to_reconstruct, current_layer):
-        is_lowpass = True if layer_to_reconstruct == current_layer else False
-        p = self.__build_pyramid(m, im, is_lowpass=is_lowpass)
+    def _inverse(self, im, m, is_lowpass):
+        k = 0
+        levels = 0
+        if is_lowpass:
+            levels = self.nlevels[m]
+        else:
+            levels = self.nlevels[self.scat_ancestor[m]]
+            k = self.K[m]
+
+        p = self.__build_pyramid(im, levels, is_lowpass, k)
         inversed = self._transform2D.inverse(p)
-
-        if self.phases[m] == -1:  # 0th level, end of reconstruction
+        if (
+            is_lowpass
+            and self.phases[m] == -1
+            or not is_lowpass
+            and self.phases[self.scat_ancestor[m]] == -1
+        ):
             return inversed
-        inversed_phase = self.__restore_phase(inversed, self.phases[m])
-
+        if is_lowpass:
+            inversed_phase = self.__restore_phase(inversed, self.phases[m])
+        else:
+            inversed_phase = self.__restore_phase(
+                inversed, self.phases[self.scat_ancestor[m]]
+            )
         return self._inverse(
-            inversed_phase,
-            self.scat_ancestor[m],
-            layer_to_reconstruct,
-            layer_to_reconstruct - 1,
+            inversed_phase, m if is_lowpass else self.scat_ancestor[m], is_lowpass=False
         )
 
     def inverse(self, m):
-        layer_to_reconstruct = self.scat_layers[m]
-        inversed = self._inverse(
-            self.scat_coefficients[m], m, layer_to_reconstruct, layer_to_reconstruct
-        )
+        inversed = self._inverse(self.scat_coefficients[m], m, is_lowpass=True)
         return inversed
